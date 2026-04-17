@@ -1,36 +1,39 @@
 import random
-import asyncio
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import Message
 from aiogram.utils import executor
-from PIL import Image, ImageFilter
 
 API_TOKEN = "8637418131:AAGEfmTnwzqtROnN2Rqg2o6oWebO_NNpHkg"
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-# ================== DATA ==================
+# ================= DATA =================
 
 group_data = {}
 user_data = {}
-user_cooldowns = {}
 
 players = [
-    {"name": "Virat Kohli", "rating": 95, "rarity": "Legendary", "image": "kohli.jpg"},
-    {"name": "MS Dhoni", "rating": 93, "rarity": "Epic", "image": "dhoni.jpg"},
-    {"name": "Rohit Sharma", "rating": 92, "rarity": "Epic", "image": "rohit.jpg"},
-    {"name": "Hardik Pandya", "rating": 89, "rarity": "Rare", "image": "hardik.jpg"},
-    {"name": "Shubman Gill", "rating": 90, "rarity": "Rare", "image": "gill.jpg"}
+    {
+        "name": "Virat Kohli",
+        "rating": 95,
+        "rarity": "Legendary",
+        "image": "images/kohli.jpg"
+    },
+    {
+        "name": "MS Dhoni",
+        "rating": 93,
+        "rarity": "Epic",
+        "image": "images/dhoni.jpg"
+    }
 ]
 
-# ================== UTIL ==================
+# ================= HELPERS =================
 
 def get_group(group_id):
     if group_id not in group_data:
         group_data[group_id] = {
             "msg_count": 0,
-            "drop_at": random.randint(20, 50),
+            "drop_at": random.randint(10, 20),
             "active_player": None
         }
     return group_data[group_id]
@@ -42,51 +45,25 @@ def get_user(user_id):
     return user_data[user_id]
 
 
-def get_random_player():
-    roll = random.randint(1, 100)
-
-    if roll <= 50:
-        rarity = "Common"
-    elif roll <= 80:
-        rarity = "Rare"
-    elif roll <= 95:
-        rarity = "Epic"
-    else:
-        rarity = "Legendary"
-
-    filtered = [p for p in players if p["rarity"] == rarity]
-    if not filtered:
-        filtered = players
-
-    return random.choice(filtered)
-
-
-def blur_image(input_path, output_path):
-    img = Image.open(input_path)
-    blurred = img.filter(ImageFilter.GaussianBlur(10))
-    blurred.save(output_path)
-
-
-# ================== DROP SYSTEM ==================
+# ================= DROP SYSTEM =================
 
 async def drop_player(group_id):
     data = get_group(group_id)
-    player = get_random_player()
-    data["active_player"] = player
+    player = random.choice(players)
 
-    blur_image(player["image"], "blur.jpg")
+    data["active_player"] = player
 
     await bot.send_photo(
         group_id,
-        photo=open("blur.jpg", "rb"),
+        photo=open(player["image"], "rb"),
         caption="🔥 Guess the player!\nUse /collect <name>"
     )
 
 
-# ================== MESSAGE HANDLER ==================
+# ================= MESSAGE HANDLER =================
 
 @dp.message_handler()
-async def handle_messages(message: Message):
+async def handle_messages(message: types.Message):
     if message.chat.type not in ["group", "supergroup"]:
         return
 
@@ -96,13 +73,13 @@ async def handle_messages(message: Message):
     if data["msg_count"] >= data["drop_at"] and not data["active_player"]:
         await drop_player(message.chat.id)
         data["msg_count"] = 0
-        data["drop_at"] = random.randint(20, 50)
+        data["drop_at"] = random.randint(10, 20)
 
 
-# ================== COLLECT ==================
+# ================= COLLECT =================
 
 @dp.message_handler(commands=["collect"])
-async def collect(message: Message):
+async def collect(message: types.Message):
     user_id = message.from_user.id
     group_id = message.chat.id
 
@@ -113,16 +90,10 @@ async def collect(message: Message):
         await message.reply("No active player right now.")
         return
 
-    args = message.get_args()
-    if not args:
-        await message.reply("Usage: /collect <player name>")
-        return
+    guess = message.get_args().lower()
 
-    guess = args.lower()
-
-    # cooldown
-    if user_id in user_cooldowns:
-        await message.reply("⏳ Wait before guessing again!")
+    if guess == "":
+        await message.reply("Use: /collect player_name")
         return
 
     if guess in player["name"].lower():
@@ -132,25 +103,21 @@ async def collect(message: Message):
         data["active_player"] = None
 
         await message.reply(
-            f"🎉 Correct!\nYou got {player['name']} ({player['rarity']}, {player['rating']})"
+            f"🎉 Correct! You got {player['name']} ({player['rarity']})"
         )
     else:
-        user_cooldowns[user_id] = True
         await message.reply("❌ Wrong guess!")
 
-        await asyncio.sleep(10)
-        user_cooldowns.pop(user_id, None)
 
-
-# ================== COLLECTION ==================
+# ================= COLLECTION =================
 
 @dp.message_handler(commands=["collection"])
-async def collection(message: Message):
+async def collection(message: types.Message):
     user = get_user(message.from_user.id)
     players = user["players"]
 
     if not players:
-        await message.reply("You have no players.")
+        await message.reply("You have no players yet.")
         return
 
     text = "🏏 Your Collection:\n"
@@ -160,14 +127,14 @@ async def collection(message: Message):
     await message.reply(text)
 
 
-# ================== START ==================
+# ================= START =================
 
 @dp.message_handler(commands=["start"])
-async def start(message: Message):
-    await message.reply("🏏 Cricket Collector Bot Started!\nChat to spawn players!")
+async def start(message: types.Message):
+    await message.reply("🏏 Bot is running! Send messages to spawn players.")
 
 
-# ================== RUN ==================
+# ================= RUN =================
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
