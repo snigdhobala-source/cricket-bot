@@ -2,7 +2,8 @@ import random
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
 
-API_TOKEN = "8637418131:AAGEfmTnwzqtROnN2Rqg2o6oWebO_NNpHkg"
+import os
+API_TOKEN = os.getenv("8637418131:AAGEfmTnwzqtROnN2Rqg2o6oWebO_NNpHkg")
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
